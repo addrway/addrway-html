@@ -1,16 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Addrway Analytics</title>
-  <link rel="stylesheet" href="styles.css" />
+
+  <link rel="stylesheet" href="styles.css"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
 </head>
+
 <body>
   <div class="shell">
+
+    <!-- SIDEBAR -->
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-logo">A</div>
@@ -20,166 +24,130 @@
         </div>
       </div>
 
-      <nav class="nav" id="nav"></nav>
+      <nav class="nav" id="nav">
+        <a href="admin.html">Dashboard</a>
+        <a href="admin-users.html">Users</a>
+        <a href="admin-lookups.html">Lookups</a>
+        <a href="analytics.html" class="active">Analytics</a>
+        <a href="billing.html">Billing</a>
+      </nav>
 
       <div class="sidebar-card">
-        <div class="muted" style="font-size:.9rem">Signed in as</div>
-        <div id="sidebarName" style="font-size:1.15rem;font-weight:700;margin-top:6px"></div>
-        <div class="note" id="sidebarNote" style="margin-top:8px"></div>
+        <div class="muted">Signed in as</div>
+        <div id="sidebarName" style="font-weight:700;margin-top:6px"></div>
+        <div id="sidebarNote" class="note"></div>
+
         <div class="footer-note">
           <button class="btn" id="logoutBtn">Log out</button>
         </div>
       </div>
     </aside>
 
+    <!-- MAIN -->
     <main class="content">
+
       <div class="topbar">
         <div>
           <div class="eyebrow">Analytics</div>
           <h2>Usage analytics</h2>
-          <div class="muted">Simple trend pages you can expand later with Supabase data.</div>
+          <div class="muted">Simple trend pages you can expand later with real Supabase data.</div>
         </div>
       </div>
 
       <section class="grid two-col">
+
         <div class="card panel-pad">
-          <h3 class="section-title">User Growth</h3>
+          <h3>User Growth</h3>
           <canvas id="growthChart"></canvas>
         </div>
 
         <div class="card panel-pad">
-          <h3 class="section-title">Plan Mix</h3>
+          <h3>Plan Mix</h3>
           <canvas id="planChart"></canvas>
         </div>
+
       </section>
+
     </main>
   </div>
 
-  <script src="app.js"></script>
+<script src="app.js"></script>
 
-  <script>
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const ADMIN_EMAIL = "lumen-bridge@outlook.com";
+<script>
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const ADMIN_EMAIL = "lumen-bridge@outlook.com";
 
-    let me = null;
+async function checkAdminAccess() {
+  const { data } = await supabaseClient.auth.getUser();
 
-    async function checkAdminAccess() {
-      const { data, error } = await supabaseClient.auth.getUser();
+  if (!data.user) {
+    window.location.href = "login.html";
+    return null;
+  }
 
-      if (error || !data.user) {
-        window.location.href = "login.html";
-        return false;
-      }
+  const email = data.user.email.toLowerCase();
 
-      const user = data.user;
-      const userEmail = (user.email || "").toLowerCase().trim();
+  if (email !== ADMIN_EMAIL.toLowerCase()) {
+    window.location.href = "https://addrway-site.vercel.app";
+    return null;
+  }
 
-      if (userEmail !== ADMIN_EMAIL.toLowerCase()) {
-        alert("Access denied. This page is restricted.");
-        window.location.href = "https://addrway-site.vercel.app";
-        return false;
-      }
+  return data.user;
+}
 
-      me = {
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata?.full_name || user.user_metadata?.name || "Luis",
-        role: "admin"
-      };
+async function logoutSupabase() {
+  await supabaseClient.auth.signOut();
+  window.location.href = "login.html";
+}
 
-      return true;
+async function init() {
+  const user = await checkAdminAccess();
+  if (!user) return;
+
+  document.getElementById("sidebarName").textContent = user.email;
+  document.getElementById("sidebarNote").textContent = "Private CEO analytics view";
+
+  document.getElementById("logoutBtn").onclick = logoutSupabase;
+
+  const db = getDB();
+
+  // PLAN MIX
+  const planCounts = { Free:0, Pro:0, Business:0 };
+
+  db.users
+    .filter(u => u.role !== "admin")
+    .forEach(u => {
+      planCounts[u.plan] = (planCounts[u.plan] || 0) + 1;
+    });
+
+  // CHART 1 - GROWTH
+  new Chart(document.getElementById("growthChart"), {
+    type: "bar",
+    data: {
+      labels: ["Week 1","Week 2","Week 3","Week 4"],
+      datasets: [{
+        label: "New Users",
+        data: [3,5,4,7],
+        backgroundColor: "rgba(34,211,238,.65)"
+      }]
     }
+  });
 
-    async function logout() {
-      await supabaseClient.auth.signOut();
-      window.location.href = "login.html";
+  // CHART 2 - PLAN MIX
+  new Chart(document.getElementById("planChart"), {
+    type: "pie",
+    data: {
+      labels: Object.keys(planCounts),
+      datasets: [{
+        data: Object.values(planCounts),
+        backgroundColor: ["#fbbf24","#22d3ee","#34d399"]
+      }]
     }
+  });
+}
 
-    function safeNavHTML() {
-      if (typeof navHTML === "function") return navHTML("Analytics");
+window.onload = init;
+</script>
 
-      return `
-        <a href="admin.html">Dashboard</a>
-        <a href="admin-users.html">Users</a>
-        <a href="admin-lookups.html">Lookups</a>
-        <a href="analytics.html" class="active">Analytics</a>
-      `;
-    }
-
-    async function initAnalyticsPage() {
-      const allowed = await checkAdminAccess();
-      if (!allowed) return;
-
-      document.getElementById("nav").innerHTML = safeNavHTML();
-      document.getElementById("sidebarName").textContent = me.name;
-      document.getElementById("sidebarNote").textContent =
-        "Your private overview of users, traffic, and address activity.";
-
-      document.getElementById("logoutBtn").addEventListener("click", async function () {
-        await logout();
-      });
-
-      const dba = getDB();
-      const pc = { Free: 0, Pro: 0, Business: 0 };
-
-      dba.users
-        .filter(u => u.role !== "admin")
-        .forEach(u => {
-          pc[u.plan] = (pc[u.plan] || 0) + 1;
-        });
-
-      new Chart(document.getElementById("growthChart"), {
-        type: "bar",
-        data: {
-          labels: ["Week 1", "Week 2", "Week 3", "Week 4"],
-          datasets: [{
-            label: "New Users",
-            data: [3, 5, 4, 7],
-            backgroundColor: "rgba(34,211,238,.65)"
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: {
-              labels: { color: "#cbd5e1" }
-            }
-          },
-          scales: {
-            x: {
-              ticks: { color: "#94a3b8" },
-              grid: { color: "rgba(148,163,184,.08)" }
-            },
-            y: {
-              ticks: { color: "#94a3b8" },
-              grid: { color: "rgba(148,163,184,.08)" }
-            }
-          }
-        }
-      });
-
-      new Chart(document.getElementById("planChart"), {
-        type: "pie",
-        data: {
-          labels: Object.keys(pc),
-          datasets: [{
-            data: Object.values(pc),
-            backgroundColor: ["#fbbf24", "#22d3ee", "#34d399"]
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: {
-              position: "bottom",
-              labels: { color: "#cbd5e1" }
-            }
-          }
-        }
-      });
-    }
-
-    window.addEventListener("load", initAnalyticsPage);
-  </script>
 </body>
 </html>
