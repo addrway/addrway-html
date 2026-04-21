@@ -1,1 +1,171 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Addrway Settings</title><link rel="stylesheet" href="styles.css"/></head><body><div class="shell"><aside class="sidebar"><div class="brand"><div class="brand-logo">A</div><div><h1>Addrway</h1><p id="roleLabel">Workspace</p></div></div><nav class="nav" id="nav"></nav><div class="sidebar-card"><div class="muted" style="font-size:.9rem">Signed in as</div><div id="sidebarName" style="font-size:1.15rem;font-weight:700;margin-top:6px"></div><div class="note" id="sidebarNote" style="margin-top:8px"></div><div class="footer-note"><button class="btn" onclick="logout()">Log out</button></div></div></aside><main class="content"><div class="topbar"><div><div class="eyebrow">Settings</div><h2>Account settings</h2><div class="muted">Update your display information in this demo.</div></div></div><div class="card panel-pad"><form id="settingsForm" class="form-grid"><div class="field"><label>Name</label><input class="input" id="setName"/></div><div class="field"><label>Email</label><input class="input" id="setEmail"/></div><div class="field"><label>Plan</label><select class="select" id="setPlan"><option>Free</option><option>Pro</option><option>Business</option></select></div><div class="field"><label>Status</label><select class="select" id="setStatus"><option>Active</option><option>Idle</option><option>Near Limit</option></select></div><div><button class="btn btn-primary" type="submit">Save changes</button></div></form><p id="setMsg" class="note"></p></div></main></div><script src="app.js"></script><script>const me=requireAuth();if(me){roleLabel.textContent=me.role==="admin"?"Admin Command Center":"Customer Workspace";nav.innerHTML=me.role==="admin"?navHTML("Settings"):customerNavHTML("Settings");sidebarName.textContent=me.name;sidebarNote.textContent=me.role==="admin"?"Manage your admin profile.":"Manage your customer profile.";setName.value=me.name;setEmail.value=me.email;setPlan.value=me.plan;setStatus.value=me.status;}settingsForm.addEventListener("submit",e=>{e.preventDefault();const db=getDB(),me2=db.users.find(u=>u.id===currentUser().id);me2.name=setName.value.trim();me2.email=setEmail.value.trim();me2.plan=setPlan.value;me2.status=setStatus.value;saveDB(db);setMsg.textContent="Saved in demo storage.";sidebarName.textContent=me2.name;})</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Addrway Settings</title>
+
+  <link rel="stylesheet" href="styles.css"/>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+</head>
+
+<body>
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">A</div>
+      <div>
+        <h1>Addrway</h1>
+        <p id="roleLabel">Workspace</p>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav"></nav>
+
+    <div class="sidebar-card">
+      <div class="muted" style="font-size:.9rem">Signed in as</div>
+      <div id="sidebarName" style="font-size:1.15rem;font-weight:700;margin-top:6px"></div>
+      <div class="note" id="sidebarNote" style="margin-top:8px"></div>
+      <div class="footer-note">
+        <button class="btn" id="logoutBtn">Log out</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="content">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Settings</div>
+        <h2>Account settings</h2>
+        <div class="muted">Manage your profile information.</div>
+      </div>
+    </div>
+
+    <div class="card panel-pad">
+      <form id="settingsForm" class="form-grid">
+        <div class="field">
+          <label>Name</label>
+          <input class="input" id="setName" />
+        </div>
+
+        <div class="field">
+          <label>Email</label>
+          <input class="input" id="setEmail" readonly />
+        </div>
+
+        <div class="field">
+          <label>Plan</label>
+          <input class="input" id="setPlan" readonly />
+        </div>
+
+        <div class="field">
+          <label>Status</label>
+          <input class="input" id="setStatus" readonly />
+        </div>
+
+        <div>
+          <button class="btn btn-primary" type="submit">Save changes</button>
+        </div>
+      </form>
+
+      <p id="setMsg" class="note"></p>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+
+<script>
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const ADMIN_EMAIL = "lumen-bridge@outlook.com";
+
+let currentUser = null;
+
+// ---------- AUTH ----------
+async function checkUser() {
+  const { data, error } = await supabaseClient.auth.getUser();
+
+  if (error || !data.user) {
+    window.location.href = "login.html";
+    return null;
+  }
+
+  currentUser = data.user;
+  return data.user;
+}
+
+// ---------- LOGOUT ----------
+async function logout() {
+  await supabaseClient.auth.signOut();
+  window.location.href = "login.html";
+}
+
+// ---------- HELPERS ----------
+function getDisplayName(user) {
+  return (
+    localStorage.getItem("addrway_display_name") ||
+    user.user_metadata?.full_name ||
+    user.user_metadata?.name ||
+    user.email ||
+    "User"
+  );
+}
+
+function getPlanValue() {
+  return localStorage.getItem("addrway_plan_name") || "Starter";
+}
+
+function getStatusValue(user) {
+  const email = (user.email || "").toLowerCase().trim();
+  if (email === ADMIN_EMAIL.toLowerCase()) return "Admin";
+  return "Active";
+}
+
+// ---------- INIT ----------
+async function initPage() {
+  const user = await checkUser();
+  if (!user) return;
+
+  const email = (user.email || "").toLowerCase().trim();
+  const isAdmin = email === ADMIN_EMAIL.toLowerCase();
+
+  document.getElementById("roleLabel").textContent =
+    isAdmin ? "Admin Command Center" : "Customer Workspace";
+
+  document.getElementById("nav").innerHTML =
+    isAdmin ? navHTML("Settings") : customerNavHTML("Settings");
+
+  document.getElementById("sidebarName").textContent = getDisplayName(user);
+  document.getElementById("sidebarNote").textContent =
+    isAdmin ? "Manage your admin profile." : "Manage your customer profile.";
+
+  document.getElementById("setName").value = getDisplayName(user);
+  document.getElementById("setEmail").value = user.email || "";
+  document.getElementById("setPlan").value = getPlanValue();
+  document.getElementById("setStatus").value = getStatusValue(user);
+
+  document.getElementById("logoutBtn").addEventListener("click", logout);
+
+  document.getElementById("settingsForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const newName = document.getElementById("setName").value.trim();
+
+    localStorage.setItem("addrway_display_name", newName || getDisplayName(user));
+
+    document.getElementById("sidebarName").textContent = newName || getDisplayName(user);
+    document.getElementById("setMsg").textContent = "Saved locally for this browser.";
+  });
+}
+
+window.addEventListener("load", initPage);
+</script>
+
+</body>
+</html>
