@@ -83,7 +83,6 @@
 
 <script>
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const ADMIN_EMAIL = "lumen-bridge@outlook.com";
 
 let currentUser = null;
 
@@ -117,13 +116,17 @@ function getDisplayName(user) {
   );
 }
 
-function getPlanValue() {
-  return localStorage.getItem("addrway_plan_name") || "Starter";
+function getPlanValue(user) {
+  return (
+    user.user_metadata?.plan ||
+    localStorage.getItem("addrway_plan_name") ||
+    "Starter"
+  );
 }
 
 function getStatusValue(user) {
-  const email = (user.email || "").toLowerCase().trim();
-  if (email === ADMIN_EMAIL.toLowerCase()) return "Admin";
+  const userRole = (user.user_metadata?.role || "").toLowerCase().trim();
+  if (userRole === "admin") return "Admin";
   return "Active";
 }
 
@@ -132,8 +135,8 @@ async function initPage() {
   const user = await checkUser();
   if (!user) return;
 
-  const email = (user.email || "").toLowerCase().trim();
-  const isAdmin = email === ADMIN_EMAIL.toLowerCase();
+  const userRole = (user.user_metadata?.role || "").toLowerCase().trim();
+  const isAdmin = userRole === "admin";
 
   document.getElementById("roleLabel").textContent =
     isAdmin ? "Admin Command Center" : "Customer Workspace";
@@ -147,7 +150,7 @@ async function initPage() {
 
   document.getElementById("setName").value = getDisplayName(user);
   document.getElementById("setEmail").value = user.email || "";
-  document.getElementById("setPlan").value = getPlanValue();
+  document.getElementById("setPlan").value = getPlanValue(user);
   document.getElementById("setStatus").value = getStatusValue(user);
 
   document.getElementById("logoutBtn").addEventListener("click", logout);
