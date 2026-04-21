@@ -1,6 +1,10 @@
-const DB_KEY = "addrway_demo_db";
-const SESSION_KEY = "addrway_session";
+// ===============================
+// ADDRWAY CORE (DEMO + UI HELPERS)
+// ===============================
 
+const DB_KEY = "addrway_demo_db";
+
+// ---------- SEED DATABASE ----------
 function seedDB() {
   const existing = localStorage.getItem(DB_KEY);
   if (existing) return JSON.parse(existing);
@@ -36,28 +40,9 @@ function seedDB() {
         status: "Near Limit",
         lookupsUsed: 824,
         createdAt: "2026-04-08T14:20:00Z"
-      },
-      {
-        id: "u-103",
-        name: "Nina Patel",
-        email: "nina@parcelpath.com",
-        role: "customer",
-        plan: "Business",
-        status: "Active",
-        lookupsUsed: 12947,
-        createdAt: "2026-04-09T08:10:00Z"
-      },
-      {
-        id: "u-104",
-        name: "David Morris",
-        email: "david@sunroute.com",
-        role: "customer",
-        plan: "Free",
-        status: "Idle",
-        lookupsUsed: 106,
-        createdAt: "2026-04-10T18:00:00Z"
       }
     ],
+
     lookups: [
       {
         id: "l-1",
@@ -74,30 +59,6 @@ function seedDB() {
         result: "Review",
         cached: false,
         createdAt: "2026-04-19T19:10:00Z"
-      },
-      {
-        id: "l-3",
-        userId: "u-103",
-        address: "4410 Cypress Rd, Austin, TX 78701",
-        result: "Valid",
-        cached: true,
-        createdAt: "2026-04-19T19:18:00Z"
-      },
-      {
-        id: "l-4",
-        userId: "u-104",
-        address: "17 Ocean Blvd, Newark, NJ 07102",
-        result: "Invalid",
-        cached: false,
-        createdAt: "2026-04-19T19:31:00Z"
-      },
-      {
-        id: "l-5",
-        userId: "admin-1",
-        address: "700 Water St, Tampa, FL 33602",
-        result: "Valid",
-        cached: true,
-        createdAt: "2026-04-19T19:36:00Z"
       }
     ]
   };
@@ -106,6 +67,7 @@ function seedDB() {
   return db;
 }
 
+// ---------- DB HELPERS ----------
 function getDB() {
   return JSON.parse(localStorage.getItem(DB_KEY) || JSON.stringify(seedDB()));
 }
@@ -114,40 +76,7 @@ function saveDB(db) {
   localStorage.setItem(DB_KEY, JSON.stringify(db));
 }
 
-function setSession(user) {
-  localStorage.setItem(
-    SESSION_KEY,
-    JSON.stringify({
-      id: user.id
-    })
-  );
-}
-
-function getSession() {
-  return JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
-}
-
-function logout() {
-  localStorage.removeItem(SESSION_KEY);
-  window.location.href = "login.html";
-}
-
-function currentUser() {
-  const session = getSession();
-  if (!session) return null;
-  return getDB().users.find((u) => u.id === session.id) || null;
-}
-
-/*
-  IMPORTANT:
-  This no longer controls real security.
-  Your real admin lock is now handled inside each page
-  with Supabase + ADMIN_EMAIL.
-*/
-function requireAuth() {
-  return currentUser();
-}
-
+// ---------- FORMAT ----------
 function formatTime(value) {
   return new Date(value).toLocaleString([], {
     month: "short",
@@ -157,34 +86,29 @@ function formatTime(value) {
   });
 }
 
+// ---------- BADGE COLORS ----------
 function badgeClass(status) {
-  const value = String(status).toLowerCase();
+  const v = String(status || "").toLowerCase();
 
-  if (["active", "valid", "business", "pro", "successful"].includes(value)) {
-    return "badge-good";
-  }
-
-  if (["near limit", "review", "free", "warning"].includes(value)) {
-    return "badge-warn";
-  }
-
-  if (["invalid", "failed", "suspended"].includes(value)) {
-    return "badge-bad";
-  }
+  if (["active", "valid", "business", "pro"].includes(v)) return "badge-good";
+  if (["near limit", "review", "warning"].includes(v)) return "badge-warn";
+  if (["invalid", "failed"].includes(v)) return "badge-bad";
 
   return "badge-neutral";
 }
 
+// ---------- USER LOOKUP ----------
 function userNameById(id) {
-  const user = getDB().users.find((u) => u.id === id);
+  const user = getDB().users.find(u => u.id === id);
   return user ? user.name : "Unknown";
 }
 
+// ---------- CREATE LOOKUP ----------
 function createLookup(address, userId) {
   const db = getDB();
 
   const cached = db.lookups.some(
-    (lookup) => lookup.address.toLowerCase() === address.toLowerCase()
+    l => l.address.toLowerCase() === address.toLowerCase()
   );
 
   let result = "Valid";
@@ -202,26 +126,24 @@ function createLookup(address, userId) {
 
   db.lookups.unshift(lookup);
 
-  const user = db.users.find((u) => u.id === userId);
+  const user = db.users.find(u => u.id === userId);
   if (user) user.lookupsUsed += 1;
 
   saveDB(db);
   return lookup;
 }
 
+// ---------- NAVIGATION ----------
 function navHTML(active) {
   return [
     ["admin.html", "Dashboard"],
     ["admin-users.html", "Users"],
     ["admin-lookups.html", "Lookups"],
     ["analytics.html", "Analytics"],
-    ["billing.html", "Billing"],
-    ["system.html", "System Health"],
-    ["settings.html", "Settings"]
+    ["billing.html", "Billing"]
   ]
-    .map(
-      ([href, label]) =>
-        `<a href="${href}" class="${active === label ? "active" : ""}">${label}</a>`
+    .map(([href, label]) =>
+      `<a href="${href}" class="${active === label ? "active" : ""}">${label}</a>`
     )
     .join("");
 }
@@ -230,12 +152,10 @@ function customerNavHTML(active) {
   return [
     ["customer-dashboard.html", "Dashboard"],
     ["lookup.html", "Lookup"],
-    ["history.html", "History"],
-    ["settings.html", "Settings"]
+    ["history.html", "History"]
   ]
-    .map(
-      ([href, label]) =>
-        `<a href="${href}" class="${active === label ? "active" : ""}">${label}</a>`
+    .map(([href, label]) =>
+      `<a href="${href}" class="${active === label ? "active" : ""}">${label}</a>`
     )
     .join("");
 }
