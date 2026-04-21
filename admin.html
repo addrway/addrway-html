@@ -127,24 +127,24 @@
 
 <script>
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const ADMIN_EMAIL = "lumen-bridge@outlook.com";
 
 async function checkAdminAccess() {
-  const { data } = await supabaseClient.auth.getUser();
+  const { data, error } = await supabaseClient.auth.getUser();
 
-  if (!data.user) {
+  if (error || !data.user) {
     window.location.href = "login.html";
     return null;
   }
 
-  const email = data.user.email.toLowerCase();
+  const user = data.user;
+  const userRole = (user.user_metadata?.role || "").toLowerCase().trim();
 
-  if (email !== ADMIN_EMAIL.toLowerCase()) {
+  if (userRole !== "admin") {
     window.location.href = "https://addrway-site.vercel.app";
     return null;
   }
 
-  return data.user;
+  return user;
 }
 
 async function logoutSupabase() {
@@ -152,62 +152,105 @@ async function logoutSupabase() {
   window.location.href = "login.html";
 }
 
+function safeBadgeClass(status) {
+  const value = String(status || "").toLowerCase();
+
+  if (value.includes("active") || value.includes("valid")) return "badge-good";
+  if (value.includes("near") || value.includes("review") || value.includes("warning")) return "badge-warn";
+  if (value.includes("invalid") || value.includes("failed") || value.includes("no_match")) return "badge-bad";
+
+  return "badge-neutral";
+}
+
 async function init() {
   const user = await checkAdminAccess();
   if (!user) return;
 
-  document.getElementById("sidebarName").textContent = user.email;
+  document.getElementById("sidebarName").textContent =
+    user.user_metadata?.full_name || user.user_metadata?.name || user.email || "Admin";
+
   document.getElementById("sidebarNote").textContent = "Private CEO dashboard";
 
   document.getElementById("logoutBtn").onclick = logoutSupabase;
 
   const db = getDB();
 
-  const users = db.users;
+  const users = db.users || [];
   const customers = users.filter(u => u.role !== "admin");
-  const lookups = db.lookups;
+  const lookups = db.lookups || [];
 
-  document.getElementById("kpiUsers").textContent = users.length;
-  document.getElementById("kpiActive").textContent = customers.length;
-  document.getElementById("kpiLookups").textContent = lookups.length;
+  document.getElementById("kpiUsers").textContent = users.length.toLocaleString();
+  document.getElementById("kpiActive").textContent = customers.length.toLocaleString();
+  document.getElementById("kpiLookups").textContent = lookups.length.toLocaleString();
 
   const cached = lookups.filter(l => l.cached).length;
   document.getElementById("kpiCache").textContent =
     lookups.length ? Math.round((cached / lookups.length) * 100) + "%" : "0%";
 
   document.getElementById("recentUsers").innerHTML =
-    customers.slice(0,5).map(u => `
+    customers.slice(0, 5).map(u => `
       <tr>
         <td>${u.name}</td>
         <td>${u.plan}</td>
-        <td>${u.status}</td>
-        <td>${u.lookupsUsed}</td>
+        <td><span class="badge ${safeBadgeClass(u.status)}">${u.status}</span></td>
+        <td>${Number(u.lookupsUsed || 0).toLocaleString()}</td>
       </tr>
-    `).join("");
+    `).join("") || `
+      <tr>
+        <td colspan="4" class="muted">No users found.</td>
+      </tr>
+    `;
 
   document.getElementById("recentLookups").innerHTML =
-    lookups.slice(0,4).map(l => `
-      <div>${l.address} (${l.result})</div>
-    `).join("");
+    lookups.slice(0, 4).map(l => `
+      <div class="quick-item spread">
+        <div>
+          <div style="font-weight:600">${l.address}</div>
+          <div class="muted">${l.userId || "Unknown user"}</div>
+        </div>
+        <span class="badge ${safeBadgeClass(l.result)}">${l.result}</span>
+      </div>
+    `).join("") || `
+      <div class="muted">No lookups found.</div>
+    `;
 
   new Chart(document.getElementById("lookupChart"), {
     type: "line",
     data: {
-      labels: ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+      labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
       datasets: [{
-        data: [5,8,6,9,7,11,13],
-        borderColor: "#22d3ee"
+        data: [5, 8, 6, 9, 7, 11, 13],
+        borderColor: "#22d3ee",
+        backgroundColor: "rgba(34,211,238,.12)",
+        fill: true,
+        tension: 0.35
       }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false }
+      }
     }
   });
 
   new Chart(document.getElementById("healthChart"), {
     type: "doughnut",
     data: {
-      labels: ["Valid","Invalid","Review"],
+      labels: ["Valid", "Invalid", "Review"],
       datasets: [{
-        data: [10,2,3]
+        data: [10, 2, 3],
+        backgroundColor: ["#34d399", "#fb7185", "#fbbf24"],
+        borderWidth: 0
       }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "bottom"
+        }
+      }
     }
   });
 }
