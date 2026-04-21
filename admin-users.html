@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Addrway Users</title>
   <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
 </head>
@@ -58,7 +57,11 @@
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody id="userRows"></tbody>
+            <tbody id="userRows">
+              <tr>
+                <td colspan="7" class="muted">Loading users...</td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -83,8 +86,7 @@
       const userEmail = (user.email || "").toLowerCase().trim();
 
       if (userEmail !== ADMIN_EMAIL.toLowerCase()) {
-        alert("Access denied.");
-        window.location.href = "dashboard.html";
+        window.location.href = "https://addrway-site.vercel.app";
         return null;
       }
 
@@ -98,8 +100,18 @@
 
     function renderUsers() {
       const db = getDB();
+      const tbody = document.getElementById("userRows");
 
-      userRows.innerHTML = db.users.map(u => `
+      if (!db.users || !db.users.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="muted">No users found.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = db.users.map(u => `
         <tr>
           <td><strong>${u.name}</strong></td>
           <td>${u.email}</td>
@@ -169,7 +181,6 @@
     }
 
     window.toggleUser = toggleUser;
-
     window.addEventListener("load", initPage);
   </script>
 </body>
