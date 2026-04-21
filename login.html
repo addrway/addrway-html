@@ -1,1 +1,99 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Addrway Login</title><link rel="stylesheet" href="styles.css"/></head><body><div class="auth-wrap"><div class="card auth-card"><div class="eyebrow">Welcome back</div><h2>Sign in to Addrway</h2><p class="muted">Admin demo: admin@addrway.com / admin123</p><form id="loginForm" class="stack" style="margin-top:18px"><div class="field"><label>Email</label><input class="input" type="email" id="email" required/></div><div class="field"><label>Password</label><input class="input" type="password" id="password" required/></div><button class="btn btn-primary" type="submit">Sign in</button><a class="btn" href="signup.html">Create account</a></form><p id="msg" class="note"></p></div></div><script src="app.js"></script><script>seedDB();const existing=currentUser();if(existing)window.location.href=existing.role==="admin"?"admin.html":"customer-dashboard.html";loginForm.addEventListener("submit",e=>{{e.preventDefault();const db=getDB();const user=db.users.find(u=>u.email.toLowerCase()===email.value.toLowerCase()&&u.password===password.value);if(!user){{msg.textContent="Invalid login. Try admin@addrway.com / admin123";return;}}setSession(user);window.location.href=user.role==="admin"?"admin.html":"customer-dashboard.html";}})</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Addrway Login</title>
+
+  <link rel="stylesheet" href="styles.css"/>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+</head>
+
+<body>
+
+<div class="auth-wrap">
+  <div class="card auth-card">
+
+    <div class="eyebrow">Welcome back</div>
+    <h2>Sign in to Addrway</h2>
+
+    <p class="muted">
+      Use your account to access the platform.
+    </p>
+
+    <form id="loginForm" class="stack" style="margin-top:18px">
+
+      <div class="field">
+        <label>Email</label>
+        <input class="input" type="email" id="email" required/>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input class="input" type="password" id="password" required/>
+      </div>
+
+      <button class="btn btn-primary" type="submit">
+        Sign in
+      </button>
+
+      <a class="btn" href="signup.html">
+        Create account
+      </a>
+
+    </form>
+
+    <p id="msg" class="note"></p>
+
+  </div>
+</div>
+
+<script>
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ---------- AUTO LOGIN ----------
+window.addEventListener("load", async () => {
+  const { data } = await supabaseClient.auth.getUser();
+
+  if (data.user) {
+    redirectUser(data.user);
+  }
+});
+
+// ---------- LOGIN ----------
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    document.getElementById("msg").textContent = error.message;
+    return;
+  }
+
+  redirectUser(data.user);
+});
+
+// ---------- REDIRECT ----------
+function redirectUser(user) {
+  const ADMIN_EMAIL = "lumen-bridge@outlook.com";
+
+  if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+    window.location.href = "admin.html";
+  } else {
+    window.location.href = "customer-dashboard.html";
+  }
+}
+</script>
+
+</body>
+</html>
