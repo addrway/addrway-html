@@ -1,1 +1,193 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Addrway History</title><link rel="stylesheet" href="styles.css"/><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head><body><div class="shell"><aside class="sidebar"><div class="brand"><div class="brand-logo">A</div><div><h1>Addrway</h1><p>Customer Workspace</p></div></div><nav class="nav" id="nav"></nav><div class="sidebar-card"><div class="muted" style="font-size:.9rem">Signed in as</div><div id="sidebarName" style="font-size:1.15rem;font-weight:700;margin-top:6px"></div><div class="note" id="sidebarNote" style="margin-top:8px"></div><div class="footer-note"><button class="btn" onclick="logout()">Log out</button></div></div></aside><main class="content"><div class="topbar"><div><div class="eyebrow">History</div><h2>Your lookup history</h2><div class="muted">All searches for your account.</div></div></div><div class="card panel-pad"><div class="table-wrap"><table><thead><tr><th>Address</th><th>Result</th><th>Cached</th><th>Time</th></tr></thead><tbody id="historyRows"></tbody></table></div></div></main></div><script src="app.js"></script><script>const me=requireAuth(null);if(me){document.getElementById("nav").innerHTML=customerNavHTML("History");sidebarName.textContent=me.name;sidebarNote.textContent=me.role==="admin"?"Your private overview of users, traffic, and address activity.":"Your workspace for address checks and history.";}</script><script>const meH=requireAuth();if(meH){const rows=getDB().lookups.filter(l=>l.userId===meH.id);historyRows.innerHTML=rows.map(l=>`<tr><td><strong>${l.address}</strong></td><td><span class="badge ${badgeClass(l.result)}">${l.result}</span></td><td>${l.cached?"Yes":"No"}</td><td>${formatTime(l.createdAt)}</td></tr>`).join("")||`<tr><td colspan="4" class="muted">No history yet.</td></tr>`;}</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Addrway History</title>
+
+  <link rel="stylesheet" href="styles.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+</head>
+
+<body>
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">A</div>
+      <div>
+        <h1>Addrway</h1>
+        <p>Customer Workspace</p>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav"></nav>
+
+    <div class="sidebar-card">
+      <div class="muted">Signed in as</div>
+      <div id="sidebarName" style="font-weight:700;margin-top:6px"></div>
+      <div class="note" id="sidebarNote"></div>
+
+      <div class="footer-note">
+        <button class="btn" id="logoutBtn">Log out</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="content">
+
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">History</div>
+        <h2>Your lookup history</h2>
+        <div class="muted">All searches for your account.</div>
+      </div>
+    </div>
+
+    <div class="card panel-pad">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Result</th>
+              <th>Confidence</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="historyRows">
+            <tr>
+              <td colspan="4">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="app.js"></script>
+
+<script>
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+
+// ---------- AUTH ----------
+async function checkUser() {
+  const { data, error } = await supabaseClient.auth.getUser();
+
+  if (error || !data.user) {
+    window.location.href = "login.html";
+    return null;
+  }
+
+  currentUser = data.user;
+  return data.user;
+}
+
+// ---------- LOGOUT ----------
+async function logout() {
+  await supabaseClient.auth.signOut();
+  window.location.href = "login.html";
+}
+
+// ---------- HELPERS ----------
+function safeBadgeClass(status) {
+  if (typeof badgeClass === "function") return badgeClass(status || "");
+
+  const value = String(status || "").toLowerCase();
+  if (value === "valid") return "badge-good";
+  if (value === "partial") return "badge-warn";
+  if (value === "no_match") return "badge-bad";
+  return "badge-neutral";
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleString();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// ---------- LOAD HISTORY ----------
+async function loadHistory() {
+  const tbody = document.getElementById("historyRows");
+
+  const { data, error } = await supabaseClient
+    .from("address_searches")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    console.error("History load error:", error.message);
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4">Failed to load history.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  const rows = data || [];
+
+  if (!rows.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" class="muted">No history yet.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(row => `
+    <tr>
+      <td><strong>${escapeHtml(row.normalized_address || row.address_line_1 || "Unknown address")}</strong></td>
+      <td><span class="badge ${safeBadgeClass(row.result_status)}">${escapeHtml(row.result_status || "—")}</span></td>
+      <td>${row.confidence ?? "—"}</td>
+      <td>${formatDate(row.created_at)}</td>
+    </tr>
+  `).join("");
+}
+
+// ---------- INIT ----------
+async function initPage() {
+  const user = await checkUser();
+  if (!user) return;
+
+  document.getElementById("nav").innerHTML = customerNavHTML("History");
+
+  document.getElementById("sidebarName").textContent =
+    user.user_metadata?.full_name || user.email;
+
+  document.getElementById("sidebarNote").textContent =
+    "Your workspace for address checks and history.";
+
+  document.getElementById("logoutBtn").addEventListener("click", logout);
+
+  await loadHistory();
+}
+
+window.addEventListener("load", initPage);
+</script>
+
+</body>
+</html>
