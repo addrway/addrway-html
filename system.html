@@ -92,7 +92,6 @@
 
   <script>
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const ADMIN_EMAIL = "lumen-bridge@outlook.com";
 
     let me = null;
 
@@ -105,11 +104,11 @@
       }
 
       const user = data.user;
-      const email = (user.email || "").toLowerCase().trim();
+      const userRole = (user.user_metadata?.role || "").toLowerCase().trim();
 
-      if (email !== ADMIN_EMAIL.toLowerCase()) {
+      if (userRole !== "admin") {
         alert("Access denied.");
-        window.location.href = "dashboard.html";
+        window.location.href = "https://addrway-site.vercel.app";
         return false;
       }
 
@@ -127,7 +126,7 @@
       if (!allowed) return;
 
       document.getElementById("sidebarName").textContent =
-        me.user_metadata?.full_name || me.user_metadata?.name || me.email;
+        me.user_metadata?.full_name || me.user_metadata?.name || me.email || "Admin";
 
       document.getElementById("sidebarNote").textContent =
         "Your private overview of users, traffic, and address activity.";
