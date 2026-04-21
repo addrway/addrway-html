@@ -90,6 +90,13 @@ async function checkUser() {
   }
 
   currentUser = data.user;
+
+  const userRole = (data.user.user_metadata?.role || "").toLowerCase().trim();
+  if (userRole === "admin") {
+    window.location.href = "admin.html";
+    return null;
+  }
+
   return data.user;
 }
 
@@ -176,7 +183,7 @@ async function initPage() {
   document.getElementById("nav").innerHTML = customerNavHTML("History");
 
   document.getElementById("sidebarName").textContent =
-    user.user_metadata?.full_name || user.email;
+    user.user_metadata?.full_name || user.user_metadata?.name || user.email || "User";
 
   document.getElementById("sidebarNote").textContent =
     "Your workspace for address checks and history.";
