@@ -1,1 +1,257 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Addrway Lookup</title><link rel="stylesheet" href="styles.css"/><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head><body><div class="shell"><aside class="sidebar"><div class="brand"><div class="brand-logo">A</div><div><h1>Addrway</h1><p>Customer Workspace</p></div></div><nav class="nav" id="nav"></nav><div class="sidebar-card"><div class="muted" style="font-size:.9rem">Signed in as</div><div id="sidebarName" style="font-size:1.15rem;font-weight:700;margin-top:6px"></div><div class="note" id="sidebarNote" style="margin-top:8px"></div><div class="footer-note"><button class="btn" onclick="logout()">Log out</button></div></div></aside><main class="content"><div class="topbar"><div><div class="eyebrow">Lookup</div><h2>Run a new address check</h2><div class="muted">This demo saves history locally and updates your usage instantly.</div></div></div><div class="card panel-pad"><form id="lookupForm" class="stack"><div class="field"><label>Street address</label><input class="input" id="addressInput" placeholder="1258 Maple Ave, Tampa, FL 33602" required/></div><div><button class="btn btn-primary" type="submit">Validate address</button></div></form><div id="lookupResult" style="margin-top:16px"></div></div></main></div><script src="app.js"></script><script>const me=requireAuth(null);if(me){document.getElementById("nav").innerHTML=customerNavHTML("Lookup");sidebarName.textContent=me.name;sidebarNote.textContent=me.role==="admin"?"Your private overview of users, traffic, and address activity.":"Your workspace for address checks and history.";}</script><script>lookupForm.addEventListener("submit",e=>{e.preventDefault();const me=requireAuth(),value=addressInput.value.trim();if(!value)return;const r=createLookup(value,me.id);lookupResult.innerHTML=`<div class="quick-item"><div style="font-weight:700">Lookup complete</div><div class="muted" style="margin-top:6px">${r.address}</div><div style="margin-top:10px" class="flex"><span class="badge ${badgeClass(r.result)}">${r.result}</span><span class="badge ${r.cached?"badge-good":"badge-neutral"}">${r.cached?"Cached Match":"Fresh Query"}</span></div></div>`;addressInput.value=""})</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Addrway Lookup</title>
+
+  <link rel="stylesheet" href="styles.css"/>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+</head>
+
+<body>
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">A</div>
+      <div>
+        <h1>Addrway</h1>
+        <p>Customer Workspace</p>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav"></nav>
+
+    <div class="sidebar-card">
+      <div class="muted" style="font-size:.9rem">Signed in as</div>
+      <div id="sidebarName" style="font-size:1.15rem;font-weight:700;margin-top:6px"></div>
+      <div class="note" id="sidebarNote" style="margin-top:8px"></div>
+      <div class="footer-note">
+        <button class="btn" id="logoutBtn">Log out</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="content">
+
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Lookup</div>
+        <h2>Run a new address check</h2>
+        <div class="muted">Validate an address and save it to your history.</div>
+      </div>
+    </div>
+
+    <div class="card panel-pad">
+      <form id="lookupForm" class="stack">
+        <div class="field">
+          <label>Street address</label>
+          <input
+            class="input"
+            id="addressInput"
+            placeholder="1258 Maple Ave, Tampa, FL 33602"
+            required
+          />
+        </div>
+
+        <div>
+          <button class="btn btn-primary" type="submit">Validate address</button>
+        </div>
+      </form>
+
+      <div id="lookupResult" style="margin-top:16px"></div>
+    </div>
+
+  </main>
+</div>
+
+<script src="app.js"></script>
+
+<script>
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const API_BASE = "https://addrway-api-phklw.ondigitalocean.app";
+
+let currentUser = null;
+
+// ---------- AUTH ----------
+async function checkUser() {
+  const { data, error } = await supabaseClient.auth.getUser();
+
+  if (error || !data.user) {
+    window.location.href = "login.html";
+    return null;
+  }
+
+  currentUser = data.user;
+  return data.user;
+}
+
+// ---------- LOGOUT ----------
+async function logout() {
+  await supabaseClient.auth.signOut();
+  window.location.href = "login.html";
+}
+
+// ---------- HELPERS ----------
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getResultMeta(data) {
+  const confidence = Number(data.confidence || 0);
+
+  if (data.valid === true || confidence >= 70) {
+    return {
+      resultStatus: "valid",
+      resultLabel: "Valid",
+      resultClass: "badge-good"
+    };
+  }
+
+  if (data.normalized || (data.components && Object.keys(data.components).length > 0)) {
+    return {
+      resultStatus: "partial",
+      resultLabel: "Partial",
+      resultClass: "badge-warn"
+    };
+  }
+
+  return {
+    resultStatus: "no_match",
+    resultLabel: "No Match",
+    resultClass: "badge-bad"
+  };
+}
+
+// ---------- SAVE SEARCH ----------
+async function saveLookupToSupabase(inputAddress, data, resultStatus) {
+  if (!currentUser) return;
+
+  const components = data.components || {};
+  const normalized = data.normalized || inputAddress || "";
+
+  let addressLine1 = inputAddress;
+  let addressLine2 = "";
+  let city = components.city || components.town || components.village || "";
+  let state = components.state || components["ISO3166-2-lvl4"] || "";
+  let zipCode = components.postcode || "";
+
+  const normalizedParts = normalized.split(",");
+
+  if (normalizedParts.length > 0 && normalizedParts[0].trim()) {
+    addressLine1 = normalizedParts[0].trim();
+  }
+
+  const { error } = await supabaseClient
+    .from("address_searches")
+    .insert({
+      user_id: currentUser.id,
+      address_line_1: addressLine1,
+      address_line_2: addressLine2,
+      city: city,
+      state: state,
+      zip_code: zipCode,
+      result_status: resultStatus,
+      normalized_address: normalized,
+      lat: data.lat || null,
+      lon: data.lon || null,
+      confidence: data.confidence || null
+    });
+
+  if (error) {
+    console.error("Save lookup error:", error.message);
+  }
+}
+
+// ---------- LOOKUP ----------
+document.getElementById("lookupForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const addressValue = document.getElementById("addressInput").value.trim();
+  const resultBox = document.getElementById("lookupResult");
+
+  if (!addressValue) return;
+
+  resultBox.innerHTML = `
+    <div class="quick-item">
+      <div style="font-weight:700">Checking address...</div>
+      <div class="muted" style="margin-top:6px">${escapeHtml(addressValue)}</div>
+    </div>
+  `;
+
+  try {
+    const response = await fetch(`${API_BASE}/validate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ address: addressValue })
+    });
+
+    const data = await response.json();
+    const meta = getResultMeta(data);
+
+    await saveLookupToSupabase(addressValue, data, meta.resultStatus);
+
+    resultBox.innerHTML = `
+      <div class="quick-item">
+        <div style="font-weight:700">Lookup complete</div>
+        <div class="muted" style="margin-top:6px">
+          ${escapeHtml(data.normalized || addressValue)}
+        </div>
+        <div style="margin-top:10px" class="flex">
+          <span class="badge ${meta.resultClass}">${meta.resultLabel}</span>
+          <span class="badge badge-neutral">
+            Confidence: ${data.confidence ?? "—"}
+          </span>
+        </div>
+      </div>
+    `;
+
+    document.getElementById("addressInput").value = "";
+  } catch (error) {
+    console.error(error);
+
+    resultBox.innerHTML = `
+      <div class="quick-item">
+        <div style="font-weight:700">Lookup failed</div>
+        <div class="muted" style="margin-top:6px">
+          Something went wrong while validating the address.
+        </div>
+      </div>
+    `;
+  }
+});
+
+// ---------- INIT ----------
+async function initPage() {
+  const user = await checkUser();
+  if (!user) return;
+
+  document.getElementById("nav").innerHTML = customerNavHTML("Lookup");
+
+  document.getElementById("sidebarName").textContent =
+    user.user_metadata?.full_name || user.email;
+
+  document.getElementById("sidebarNote").textContent =
+    "Your workspace for address checks and history.";
+
+  document.getElementById("logoutBtn").addEventListener("click", logout);
+}
+
+window.addEventListener("load", initPage);
+</script>
+
+</body>
+</html>
