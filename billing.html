@@ -1,1 +1,150 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Addrway Billing</title><link rel="stylesheet" href="styles.css"/><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head><body><div class="shell"><aside class="sidebar"><div class="brand"><div class="brand-logo">A</div><div><h1>Addrway</h1><p>Admin Command Center</p></div></div><nav class="nav" id="nav"></nav><div class="sidebar-card"><div class="muted" style="font-size:.9rem">Signed in as</div><div id="sidebarName" style="font-size:1.15rem;font-weight:700;margin-top:6px"></div><div class="note" id="sidebarNote" style="margin-top:8px"></div><div class="footer-note"><button class="btn" onclick="logout()">Log out</button></div></div></aside><main class="content"><div class="topbar"><div><div class="eyebrow">Billing</div><h2>Plans and revenue view</h2><div class="muted">Starter pricing page for admin review.</div></div></div><section class="grid kpi-grid"><div class="card panel-pad"><div class="muted">Free</div><h3>0</h3><p>Entry tier</p></div><div class="card panel-pad"><div class="muted">Pro</div><h3>$15</h3><p>1,000 lookups</p></div><div class="card panel-pad"><div class="muted">Business</div><h3>$40</h3><p>5,000 lookups</p></div><div class="card panel-pad"><div class="muted">Monthly Revenue</div><h3>$2,840</h3><p>Projected demo total</p></div></section><div class="card panel-pad" style="margin-top:16px"><h3 class="section-title">Monetization notes</h3><p class="muted">This page is ready for Stripe or your future billing provider. Right now it acts as your internal billing view.</p></div></main></div><script src="app.js"></script><script>const me=requireAuth("admin");if(me){document.getElementById("nav").innerHTML=navHTML("Billing");sidebarName.textContent=me.name;sidebarNote.textContent=me.role==="admin"?"Your private overview of users, traffic, and address activity.":"Your workspace for address checks and history.";}</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Addrway Billing</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">A</div>
+        <div>
+          <h1>Addrway</h1>
+          <p>Admin Command Center</p>
+        </div>
+      </div>
+
+      <nav class="nav" id="nav"></nav>
+
+      <div class="sidebar-card">
+        <div class="muted" style="font-size:.9rem">Signed in as</div>
+        <div id="sidebarName" style="font-size:1.15rem;font-weight:700;margin-top:6px"></div>
+        <div class="note" id="sidebarNote" style="margin-top:8px"></div>
+        <div class="footer-note">
+          <button class="btn" id="logoutBtn">Log out</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div class="topbar">
+        <div>
+          <div class="eyebrow">Billing</div>
+          <h2>Plans and revenue view</h2>
+          <div class="muted">Starter pricing page for admin review.</div>
+        </div>
+      </div>
+
+      <section class="grid kpi-grid">
+        <div class="card panel-pad">
+          <div class="muted">Free</div>
+          <h3>0</h3>
+          <p>Entry tier</p>
+        </div>
+
+        <div class="card panel-pad">
+          <div class="muted">Pro</div>
+          <h3>$15</h3>
+          <p>1,000 lookups</p>
+        </div>
+
+        <div class="card panel-pad">
+          <div class="muted">Business</div>
+          <h3>$40</h3>
+          <p>5,000 lookups</p>
+        </div>
+
+        <div class="card panel-pad">
+          <div class="muted">Monthly Revenue</div>
+          <h3>$2,840</h3>
+          <p>Projected demo total</p>
+        </div>
+      </section>
+
+      <div class="card panel-pad" style="margin-top:16px">
+        <h3 class="section-title">Monetization notes</h3>
+        <p class="muted">
+          This page is ready for Stripe or your future billing provider.
+          Right now it acts as your internal billing view.
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+
+  <script>
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const ADMIN_EMAIL = "lumen-bridge@outlook.com";
+
+    let me = null;
+
+    async function checkAdminAccess() {
+      const { data, error } = await supabaseClient.auth.getUser();
+
+      if (error || !data.user) {
+        window.location.href = "login.html";
+        return false;
+      }
+
+      const user = data.user;
+      const userEmail = (user.email || "").toLowerCase().trim();
+
+      if (userEmail !== ADMIN_EMAIL.toLowerCase()) {
+        alert("Access denied. This page is restricted.");
+        window.location.href = "https://addrway-site.vercel.app";
+        return false;
+      }
+
+      me = {
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.full_name || user.user_metadata?.name || "Luis",
+        role: "admin"
+      };
+
+      return true;
+    }
+
+    async function logoutSupabase() {
+      await supabaseClient.auth.signOut();
+      window.location.href = "login.html";
+    }
+
+    function safeNavHTML() {
+      if (typeof navHTML === "function") return navHTML("Billing");
+
+      return `
+        <a href="admin.html">Dashboard</a>
+        <a href="admin-users.html">Users</a>
+        <a href="admin-lookups.html">Lookups</a>
+        <a href="analytics.html">Analytics</a>
+        <a href="billing.html" class="active">Billing</a>
+        <a href="system.html">System Health</a>
+        <a href="settings.html">Settings</a>
+      `;
+    }
+
+    async function initBillingPage() {
+      const allowed = await checkAdminAccess();
+      if (!allowed) return;
+
+      document.getElementById("nav").innerHTML = safeNavHTML();
+      document.getElementById("sidebarName").textContent = me.name;
+      document.getElementById("sidebarNote").textContent =
+        "Your private overview of users, traffic, and address activity.";
+
+      document.getElementById("logoutBtn").addEventListener("click", async function () {
+        await logoutSupabase();
+      });
+    }
+
+    window.addEventListener("load", initBillingPage);
+  </script>
+</body>
+</html>
