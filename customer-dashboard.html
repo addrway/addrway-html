@@ -1,1 +1,236 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Addrway Customer Dashboard</title><link rel="stylesheet" href="styles.css"/><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head><body><div class="shell"><aside class="sidebar"><div class="brand"><div class="brand-logo">A</div><div><h1>Addrway</h1><p>Customer Workspace</p></div></div><nav class="nav" id="nav"></nav><div class="sidebar-card"><div class="muted" style="font-size:.9rem">Signed in as</div><div id="sidebarName" style="font-size:1.15rem;font-weight:700;margin-top:6px"></div><div class="note" id="sidebarNote" style="margin-top:8px"></div><div class="footer-note"><button class="btn" onclick="logout()">Log out</button></div></div></aside><main class="content"><div class="topbar"><div><div class="eyebrow">Workspace</div><h2>Your customer dashboard</h2><div class="muted">Search, review history, and watch your usage.</div></div><div class="right"><button class="btn btn-primary" onclick="location.href='lookup.html'">New lookup</button></div></div><section class="grid kpi-grid"><div class="card panel-pad kpi"><p class="muted">Your Plan</p><h3 id="planBox"></h3><small class="muted">Current subscription tier</small></div><div class="card panel-pad kpi"><p class="muted">Lookups Used</p><h3 id="usedBox"></h3><small class="muted">Running total</small></div><div class="card panel-pad kpi"><p class="muted">Recent Result</p><h3 id="resultBox"></h3><small class="muted">Last lookup status</small></div><div class="card panel-pad kpi"><p class="muted">Cached Hits</p><h3 id="cachedBox"></h3><small class="muted">Repeated address speedups</small></div></section><div class="card panel-pad" style="margin-top:16px"><div class="spread"><div><h3 class="section-title">Recent history</h3><div class="muted">Your latest address checks</div></div><a class="btn" href="history.html">Open full history</a></div><div class="table-wrap"><table><thead><tr><th>Address</th><th>Result</th><th>Cached</th><th>Time</th></tr></thead><tbody id="custRows"></tbody></table></div></div></main></div><script src="app.js"></script><script>const me=requireAuth(null);if(me){document.getElementById("nav").innerHTML=customerNavHTML("Dashboard");sidebarName.textContent=me.name;sidebarNote.textContent=me.role==="admin"?"Your private overview of users, traffic, and address activity.":"Your workspace for address checks and history.";}</script><script>const meC=requireAuth();if(meC){const db=getDB(),mine=db.lookups.filter(l=>l.userId===meC.id),last=mine[0];planBox.textContent=meC.plan;usedBox.textContent=meC.lookupsUsed.toLocaleString();resultBox.textContent=last?last.result:"—";cachedBox.textContent=mine.filter(l=>l.cached).length.toLocaleString();custRows.innerHTML=mine.map(l=>`<tr><td><strong>${l.address}</strong></td><td><span class="badge ${badgeClass(l.result)}">${l.result}</span></td><td>${l.cached?"Yes":"No"}</td><td>${formatTime(l.createdAt)}</td></tr>`).join("")||`<tr><td colspan="4" class="muted">No lookups yet.</td></tr>`;}</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Addrway Customer Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">A</div>
+        <div>
+          <h1>Addrway</h1>
+          <p>Customer Workspace</p>
+        </div>
+      </div>
+
+      <nav class="nav" id="nav"></nav>
+
+      <div class="sidebar-card">
+        <div class="muted" style="font-size:.9rem">Signed in as</div>
+        <div id="sidebarName" style="font-size:1.15rem;font-weight:700;margin-top:6px"></div>
+        <div class="note" id="sidebarNote" style="margin-top:8px"></div>
+        <div class="footer-note">
+          <button class="btn" id="logoutBtn">Log out</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div class="topbar">
+        <div>
+          <div class="eyebrow">Workspace</div>
+          <h2>Your customer dashboard</h2>
+          <div class="muted">Search, review history, and watch your usage.</div>
+        </div>
+        <div class="right">
+          <button class="btn btn-primary" onclick="location.href='lookup.html'">New lookup</button>
+        </div>
+      </div>
+
+      <section class="grid kpi-grid">
+        <div class="card panel-pad kpi">
+          <p class="muted">Your Plan</p>
+          <h3 id="planBox">—</h3>
+          <small class="muted">Current subscription tier</small>
+        </div>
+
+        <div class="card panel-pad kpi">
+          <p class="muted">Lookups Used</p>
+          <h3 id="usedBox">0</h3>
+          <small class="muted">Running total</small>
+        </div>
+
+        <div class="card panel-pad kpi">
+          <p class="muted">Recent Result</p>
+          <h3 id="resultBox">—</h3>
+          <small class="muted">Last lookup status</small>
+        </div>
+
+        <div class="card panel-pad kpi">
+          <p class="muted">Cached Hits</p>
+          <h3 id="cachedBox">0</h3>
+          <small class="muted">Repeated address speedups</small>
+        </div>
+      </section>
+
+      <div class="card panel-pad" style="margin-top:16px">
+        <div class="spread">
+          <div>
+            <h3 class="section-title">Recent history</h3>
+            <div class="muted">Your latest address checks</div>
+          </div>
+          <a class="btn" href="history.html">Open full history</a>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Address</th>
+                <th>Result</th>
+                <th>Confidence</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="custRows">
+              <tr>
+                <td colspan="4" class="muted">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+
+  <script>
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let currentUser = null;
+
+    function safeCustomerNavHTML() {
+      if (typeof customerNavHTML === "function") return customerNavHTML("Dashboard");
+
+      return `
+        <a href="customer-dashboard.html" class="active">Dashboard</a>
+        <a href="lookup.html">Lookup</a>
+        <a href="history.html">History</a>
+        <a href="settings.html">Settings</a>
+      `;
+    }
+
+    function safeBadgeClass(status) {
+      if (typeof badgeClass === "function") return badgeClass(status || "");
+
+      const value = String(status || "").toLowerCase();
+      if (value === "valid") return "badge-good";
+      if (value === "partial") return "badge-warn";
+      if (value === "no_match") return "badge-bad";
+      return "badge-neutral";
+    }
+
+    function formatDate(value) {
+      if (!value) return "—";
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return value;
+      return d.toLocaleString();
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    async function checkCustomerAccess() {
+      const { data, error } = await supabaseClient.auth.getUser();
+
+      if (error || !data.user) {
+        window.location.href = "login.html";
+        return null;
+      }
+
+      return data.user;
+    }
+
+    async function logoutSupabase() {
+      await supabaseClient.auth.signOut();
+      window.location.href = "login.html";
+    }
+
+    async function loadCustomerDashboard() {
+      const { data, error } = await supabaseClient
+        .from("address_searches")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error("Customer dashboard load error:", error.message);
+        document.getElementById("custRows").innerHTML = `
+          <tr>
+            <td colspan="4" class="muted">Failed to load your history.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      const rows = data || [];
+      const last = rows[0] || null;
+      const cachedHits = 0;
+
+      document.getElementById("planBox").textContent =
+        localStorage.getItem("addrway_plan_name") || "Starter";
+
+      document.getElementById("usedBox").textContent = rows.length.toLocaleString();
+      document.getElementById("resultBox").textContent = last ? (last.result_status || "—") : "—";
+      document.getElementById("cachedBox").textContent = cachedHits.toLocaleString();
+
+      const tbody = document.getElementById("custRows");
+
+      if (!rows.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" class="muted">No lookups yet.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(row => `
+        <tr>
+          <td><strong>${escapeHtml(row.normalized_address || row.address_line_1 || "Unknown address")}</strong></td>
+          <td><span class="badge ${safeBadgeClass(row.result_status)}">${escapeHtml(row.result_status || "—")}</span></td>
+          <td>${row.confidence ?? "—"}</td>
+          <td>${formatDate(row.created_at)}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function initCustomerPage() {
+      currentUser = await checkCustomerAccess();
+      if (!currentUser) return;
+
+      document.getElementById("nav").innerHTML = safeCustomerNavHTML();
+      document.getElementById("sidebarName").textContent =
+        currentUser.user_metadata?.full_name ||
+        currentUser.user_metadata?.name ||
+        currentUser.email ||
+        "Customer";
+
+      document.getElementById("sidebarNote").textContent =
+        "Your workspace for address checks and history.";
+
+      document.getElementById("logoutBtn").addEventListener("click", async function () {
+        await logoutSupabase();
+      });
+
+      await loadCustomerDashboard();
+    }
+
+    window.addEventListener("load", initCustomerPage);
+  </script>
+</body>
+</html>
