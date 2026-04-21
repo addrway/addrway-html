@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Addrway Login</title>
+  <title>Addrway Admin Login</title>
 
   <link rel="stylesheet" href="styles.css"/>
 
@@ -17,11 +17,11 @@
 <div class="auth-wrap">
   <div class="card auth-card">
 
-    <div class="eyebrow">Welcome back</div>
-    <h2>Sign in to Addrway</h2>
+    <div class="eyebrow">Admin Access</div>
+    <h2>Addrway Command Center</h2>
 
     <p class="muted">
-      Use your account to access the platform.
+      Authorized access only.
     </p>
 
     <form id="loginForm" class="stack" style="margin-top:18px">
@@ -40,10 +40,6 @@
         Sign in
       </button>
 
-      <a class="btn" href="signup.html">
-        Create account
-      </a>
-
     </form>
 
     <p id="msg" class="note"></p>
@@ -53,6 +49,7 @@
 
 <script>
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const ADMIN_EMAIL = "lumen-bridge@outlook.com";
 
 // ---------- AUTO LOGIN ----------
 window.addEventListener("load", async () => {
@@ -85,12 +82,14 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 
 // ---------- REDIRECT ----------
 function redirectUser(user) {
-  const ADMIN_EMAIL = "lumen-bridge@outlook.com";
+  const email = (user.email || "").toLowerCase().trim();
 
-  if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+  if (email === ADMIN_EMAIL.toLowerCase()) {
     window.location.href = "admin.html";
   } else {
-    window.location.href = "customer-dashboard.html";
+    // 🚨 BLOCK NON-ADMIN USERS
+    alert("Access denied.");
+    window.location.href = "https://addrway-site.vercel.app";
   }
 }
 </script>
