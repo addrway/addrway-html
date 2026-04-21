@@ -49,7 +49,6 @@
 
 <script>
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const ADMIN_EMAIL = "lumen-bridge@outlook.com";
 
 // ---------- AUTO LOGIN ----------
 window.addEventListener("load", async () => {
@@ -64,8 +63,11 @@ window.addEventListener("load", async () => {
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const email = document.getElementById("email").value;
+  const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
+  const msg = document.getElementById("msg");
+
+  msg.textContent = "";
 
   const { data, error } = await supabaseClient.auth.signInWithPassword({
     email,
@@ -73,7 +75,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   });
 
   if (error) {
-    document.getElementById("msg").textContent = error.message;
+    msg.textContent = error.message;
     return;
   }
 
@@ -82,12 +84,11 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 
 // ---------- REDIRECT ----------
 function redirectUser(user) {
-  const email = (user.email || "").toLowerCase().trim();
+  const userRole = (user.user_metadata?.role || "").toLowerCase().trim();
 
-  if (email === ADMIN_EMAIL.toLowerCase()) {
+  if (userRole === "admin") {
     window.location.href = "admin.html";
   } else {
-    // 🚨 BLOCK NON-ADMIN USERS
     alert("Access denied.");
     window.location.href = "https://addrway-site.vercel.app";
   }
