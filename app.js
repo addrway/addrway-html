@@ -13,8 +13,8 @@ function seedDB() {
     users: [
       {
         id: "admin-1",
-        name: "Luis",
-        email: "admin@addrway.com",
+        name: "Admin User",
+        email: "admin-user@private.local",
         role: "admin",
         plan: "Business",
         status: "Active",
@@ -88,11 +88,11 @@ function formatTime(value) {
 
 // ---------- BADGE COLORS ----------
 function badgeClass(status) {
-  const v = String(status || "").toLowerCase();
+  const value = String(status || "").toLowerCase();
 
-  if (["active", "valid", "business", "pro"].includes(v)) return "badge-good";
-  if (["near limit", "review", "warning"].includes(v)) return "badge-warn";
-  if (["invalid", "failed"].includes(v)) return "badge-bad";
+  if (["active", "valid", "business", "pro"].includes(value)) return "badge-good";
+  if (["near limit", "review", "warning", "partial"].includes(value)) return "badge-warn";
+  if (["invalid", "failed", "no_match"].includes(value)) return "badge-bad";
 
   return "badge-neutral";
 }
@@ -140,7 +140,9 @@ function navHTML(active) {
     ["admin-users.html", "Users"],
     ["admin-lookups.html", "Lookups"],
     ["analytics.html", "Analytics"],
-    ["billing.html", "Billing"]
+    ["billing.html", "Billing"],
+    ["system.html", "System Health"],
+    ["settings.html", "Settings"]
   ]
     .map(([href, label]) =>
       `<a href="${href}" class="${active === label ? "active" : ""}">${label}</a>`
@@ -152,7 +154,8 @@ function customerNavHTML(active) {
   return [
     ["customer-dashboard.html", "Dashboard"],
     ["lookup.html", "Lookup"],
-    ["history.html", "History"]
+    ["history.html", "History"],
+    ["settings.html", "Settings"]
   ]
     .map(([href, label]) =>
       `<a href="${href}" class="${active === label ? "active" : ""}">${label}</a>`
