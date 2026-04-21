@@ -55,7 +55,6 @@
       </div>
 
       <section class="grid two-col">
-
         <div class="card panel-pad">
           <h3>User Growth</h3>
           <canvas id="growthChart"></canvas>
@@ -65,7 +64,6 @@
           <h3>Plan Mix</h3>
           <canvas id="planChart"></canvas>
         </div>
-
       </section>
 
     </main>
@@ -75,24 +73,24 @@
 
 <script>
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const ADMIN_EMAIL = "lumen-bridge@outlook.com";
 
 async function checkAdminAccess() {
-  const { data } = await supabaseClient.auth.getUser();
+  const { data, error } = await supabaseClient.auth.getUser();
 
-  if (!data.user) {
+  if (error || !data.user) {
     window.location.href = "login.html";
     return null;
   }
 
-  const email = data.user.email.toLowerCase();
+  const user = data.user;
+  const userRole = (user.user_metadata?.role || "").toLowerCase().trim();
 
-  if (email !== ADMIN_EMAIL.toLowerCase()) {
+  if (userRole !== "admin") {
     window.location.href = "https://addrway-site.vercel.app";
     return null;
   }
 
-  return data.user;
+  return user;
 }
 
 async function logoutSupabase() {
@@ -104,15 +102,16 @@ async function init() {
   const user = await checkAdminAccess();
   if (!user) return;
 
-  document.getElementById("sidebarName").textContent = user.email;
+  document.getElementById("sidebarName").textContent =
+    user.user_metadata?.full_name || user.user_metadata?.name || user.email || "Admin";
+
   document.getElementById("sidebarNote").textContent = "Private CEO analytics view";
 
   document.getElementById("logoutBtn").onclick = logoutSupabase;
 
   const db = getDB();
 
-  // PLAN MIX
-  const planCounts = { Free:0, Pro:0, Business:0 };
+  const planCounts = { Free: 0, Pro: 0, Business: 0 };
 
   db.users
     .filter(u => u.role !== "admin")
@@ -120,28 +119,53 @@ async function init() {
       planCounts[u.plan] = (planCounts[u.plan] || 0) + 1;
     });
 
-  // CHART 1 - GROWTH
   new Chart(document.getElementById("growthChart"), {
     type: "bar",
     data: {
-      labels: ["Week 1","Week 2","Week 3","Week 4"],
+      labels: ["Week 1", "Week 2", "Week 3", "Week 4"],
       datasets: [{
         label: "New Users",
-        data: [3,5,4,7],
+        data: [3, 5, 4, 7],
         backgroundColor: "rgba(34,211,238,.65)"
       }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          labels: { color: "#cbd5e1" }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: "#94a3b8" },
+          grid: { color: "rgba(148,163,184,.08)" }
+        },
+        y: {
+          ticks: { color: "#94a3b8" },
+          grid: { color: "rgba(148,163,184,.08)" }
+        }
+      }
     }
   });
 
-  // CHART 2 - PLAN MIX
   new Chart(document.getElementById("planChart"), {
     type: "pie",
     data: {
       labels: Object.keys(planCounts),
       datasets: [{
         data: Object.values(planCounts),
-        backgroundColor: ["#fbbf24","#22d3ee","#34d399"]
+        backgroundColor: ["#fbbf24", "#22d3ee", "#34d399"]
       }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { color: "#cbd5e1" }
+        }
+      }
     }
   });
 }
