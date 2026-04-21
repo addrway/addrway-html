@@ -1,15 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Addrway Billing</title>
-  <link rel="stylesheet" href="styles.css" />
+
+  <link rel="stylesheet" href="styles.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
 </head>
+
 <body>
   <div class="shell">
+
+    <!-- SIDEBAR -->
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-logo">A</div>
@@ -25,25 +32,30 @@
         <div class="muted" style="font-size:.9rem">Signed in as</div>
         <div id="sidebarName" style="font-size:1.15rem;font-weight:700;margin-top:6px"></div>
         <div class="note" id="sidebarNote" style="margin-top:8px"></div>
+
         <div class="footer-note">
           <button class="btn" id="logoutBtn">Log out</button>
         </div>
       </div>
     </aside>
 
+    <!-- MAIN -->
     <main class="content">
+
       <div class="topbar">
         <div>
           <div class="eyebrow">Billing</div>
           <h2>Plans and revenue view</h2>
-          <div class="muted">Starter pricing page for admin review.</div>
+          <div class="muted">Internal billing dashboard.</div>
         </div>
       </div>
 
+      <!-- PLANS -->
       <section class="grid kpi-grid">
+
         <div class="card panel-pad">
           <div class="muted">Free</div>
-          <h3>0</h3>
+          <h3>$0</h3>
           <p>Entry tier</p>
         </div>
 
@@ -61,18 +73,20 @@
 
         <div class="card panel-pad">
           <div class="muted">Monthly Revenue</div>
-          <h3>$2,840</h3>
-          <p>Projected demo total</p>
+          <h3 id="revenueBox">$0</h3>
+          <p>Calculated from users</p>
         </div>
+
       </section>
 
+      <!-- NOTES -->
       <div class="card panel-pad" style="margin-top:16px">
-        <h3 class="section-title">Monetization notes</h3>
+        <h3 class="section-title">Monetization Notes</h3>
         <p class="muted">
-          This page is ready for Stripe or your future billing provider.
-          Right now it acts as your internal billing view.
+          Ready for Stripe integration. This is your internal billing control center.
         </p>
       </div>
+
     </main>
   </div>
 
@@ -93,58 +107,58 @@
       }
 
       const user = data.user;
-      const userEmail = (user.email || "").toLowerCase().trim();
+      const email = (user.email || "").toLowerCase().trim();
 
-      if (userEmail !== ADMIN_EMAIL.toLowerCase()) {
-        alert("Access denied. This page is restricted.");
-        window.location.href = "https://addrway-site.vercel.app";
+      if (email !== ADMIN_EMAIL) {
+        alert("Access denied.");
+        window.location.href = "dashboard.html";
         return false;
       }
 
-      me = {
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata?.full_name || user.user_metadata?.name || "Luis",
-        role: "admin"
-      };
-
+      me = user;
       return true;
     }
 
-    async function logoutSupabase() {
+    async function logout() {
       await supabaseClient.auth.signOut();
       window.location.href = "login.html";
     }
 
-    function safeNavHTML() {
-      if (typeof navHTML === "function") return navHTML("Billing");
+    function calculateRevenue() {
+      const db = getDB();
 
-      return `
-        <a href="admin.html">Dashboard</a>
-        <a href="admin-users.html">Users</a>
-        <a href="admin-lookups.html">Lookups</a>
-        <a href="analytics.html">Analytics</a>
-        <a href="billing.html" class="active">Billing</a>
-        <a href="system.html">System Health</a>
-        <a href="settings.html">Settings</a>
-      `;
+      let revenue = 0;
+
+      db.users.forEach(user => {
+        if (user.role !== "admin") {
+          if (user.plan === "Pro") revenue += 15;
+          if (user.plan === "Business") revenue += 40;
+        }
+      });
+
+      document.getElementById("revenueBox").textContent =
+        "$" + revenue.toLocaleString();
     }
 
-    async function initBillingPage() {
+    async function initPage() {
       const allowed = await checkAdminAccess();
       if (!allowed) return;
 
-      document.getElementById("nav").innerHTML = safeNavHTML();
-      document.getElementById("sidebarName").textContent = me.name;
-      document.getElementById("sidebarNote").textContent =
-        "Your private overview of users, traffic, and address activity.";
+      document.getElementById("nav").innerHTML = navHTML("Billing");
 
-      document.getElementById("logoutBtn").addEventListener("click", async function () {
-        await logoutSupabase();
-      });
+      document.getElementById("sidebarName").textContent =
+        me.user_metadata?.full_name || me.email;
+
+      document.getElementById("sidebarNote").textContent =
+        "Private billing control panel.";
+
+      document.getElementById("logoutBtn").addEventListener("click", logout);
+
+      calculateRevenue();
     }
 
-    window.addEventListener("load", initBillingPage);
+    window.addEventListener("load", initPage);
   </script>
+
 </body>
 </html>
