@@ -24,6 +24,7 @@
         <a href="admin-users.html">Users</a>
         <a href="admin-lookups.html" class="active">Lookups</a>
         <a href="analytics.html">Analytics</a>
+        <a href="billing.html">Billing</a>
       </nav>
 
       <div class="sidebar-card">
@@ -83,7 +84,7 @@
       const user = data.user;
       const email = (user.email || "").toLowerCase().trim();
 
-      if (email !== ADMIN_EMAIL) {
+      if (email !== ADMIN_EMAIL.toLowerCase()) {
         window.location.href = "https://addrway-site.vercel.app";
         return null;
       }
@@ -91,7 +92,7 @@
       return user;
     }
 
-    async function logout() {
+    async function logoutSupabase() {
       await supabaseClient.auth.signOut();
       window.location.href = "login.html";
     }
@@ -164,7 +165,7 @@
     }
 
     document.getElementById("logoutBtn").addEventListener("click", async function () {
-      await logout();
+      await logoutSupabase();
     });
 
     window.addEventListener("load", async () => {
