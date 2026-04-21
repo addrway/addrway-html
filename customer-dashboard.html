@@ -75,8 +75,8 @@
       </div>
 
       <div class="card panel-pad kpi">
-        <p class="muted">Cached Hits</p>
-        <h3 id="cachedBox">0</h3>
+        <p class="muted">Recent Coordinates</p>
+        <h3 id="cachedBox">—</h3>
       </div>
 
     </section>
@@ -99,7 +99,7 @@
             <tr>
               <th>Address</th>
               <th>Result</th>
-              <th>Cached</th>
+              <th>Confidence</th>
               <th>Time</th>
             </tr>
           </thead>
@@ -131,6 +131,13 @@ async function checkUser() {
   }
 
   currentUser = data.user;
+
+  const userRole = (data.user.user_metadata?.role || "").toLowerCase().trim();
+  if (userRole === "admin") {
+    window.location.href = "admin.html";
+    return null;
+  }
+
   return data.user;
 }
 
@@ -140,31 +147,79 @@ async function logout() {
   window.location.href = "login.html";
 }
 
-// ---------- LOAD UI ----------
-function loadDemoData(user) {
-  const db = getDB();
+// ---------- HELPERS ----------
+function safeBadgeClass(status) {
+  const value = String(status || "").toLowerCase();
+  if (["valid", "active", "business", "pro"].includes(value)) return "badge-good";
+  if (["partial", "review", "warning", "near limit"].includes(value)) return "badge-warn";
+  if (["no_match", "invalid", "failed"].includes(value)) return "badge-bad";
+  return "badge-neutral";
+}
 
-  // fallback demo mapping
-  const demoUser = db.users[1]; // sample user
+function formatDate(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleString();
+}
 
-  const mine = db.lookups.filter(l => l.userId === demoUser.id);
-  const last = mine[0];
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
-  document.getElementById("planBox").textContent = demoUser.plan;
-  document.getElementById("usedBox").textContent = demoUser.lookupsUsed.toLocaleString();
-  document.getElementById("resultBox").textContent = last ? last.result : "—";
-  document.getElementById("cachedBox").textContent =
-    mine.filter(l => l.cached).length.toLocaleString();
+// ---------- LOAD DASHBOARD DATA ----------
+async function loadDashboardData() {
+  const tbody = document.getElementById("custRows");
 
-  document.getElementById("custRows").innerHTML =
-    mine.map(l => `
-      <tr>
-        <td><strong>${l.address}</strong></td>
-        <td><span class="badge ${badgeClass(l.result)}">${l.result}</span></td>
-        <td>${l.cached ? "Yes" : "No"}</td>
-        <td>${formatTime(l.createdAt)}</td>
-      </tr>
-    `).join("") || `<tr><td colspan="4">No data</td></tr>`;
+  const { data, error } = await supabaseClient
+    .from("address_searches")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  if (error) {
+    console.error("Dashboard history load error:", error.message);
+    tbody.innerHTML = `<tr><td colspan="4">Failed to load your history.</td></tr>`;
+    return;
+  }
+
+  const rows = data || [];
+  const latest = rows[0];
+
+  const planFromMetadata =
+    currentUser.user_metadata?.plan ||
+    localStorage.getItem("addrway_plan_name") ||
+    "Starter";
+
+  document.getElementById("planBox").textContent = planFromMetadata;
+  document.getElementById("usedBox").textContent = rows.length.toLocaleString();
+  document.getElementById("resultBox").textContent = latest ? (latest.result_status || "—") : "—";
+
+  if (latest && latest.lat && latest.lon) {
+    document.getElementById("cachedBox").textContent = `${latest.lat}, ${latest.lon}`;
+  } else {
+    document.getElementById("cachedBox").textContent = "—";
+  }
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="4">No data</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.slice(0, 8).map(row => `
+    <tr>
+      <td><strong>${escapeHtml(row.normalized_address || row.address_line_1 || "Unknown address")}</strong></td>
+      <td><span class="badge ${safeBadgeClass(row.result_status)}">${escapeHtml(row.result_status || "—")}</span></td>
+      <td>${row.confidence ?? "—"}</td>
+      <td>${formatDate(row.created_at)}</td>
+    </tr>
+  `).join("");
 }
 
 // ---------- INIT ----------
@@ -175,14 +230,14 @@ async function initPage() {
   document.getElementById("nav").innerHTML = customerNavHTML("Dashboard");
 
   document.getElementById("sidebarName").textContent =
-    user.user_metadata?.full_name || user.email;
+    user.user_metadata?.full_name || user.user_metadata?.name || user.email || "User";
 
   document.getElementById("sidebarNote").textContent =
     "Your workspace for address checks and history.";
 
   document.getElementById("logoutBtn").addEventListener("click", logout);
 
-  loadDemoData(user);
+  await loadDashboardData();
 }
 
 window.addEventListener("load", initPage);
