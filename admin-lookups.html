@@ -71,7 +71,6 @@
 
   <script>
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const ADMIN_EMAIL = "lumen-bridge@outlook.com";
 
     async function checkAdminAccess() {
       const { data, error } = await supabaseClient.auth.getUser();
@@ -82,9 +81,9 @@
       }
 
       const user = data.user;
-      const email = (user.email || "").toLowerCase().trim();
+      const userRole = (user.user_metadata?.role || "").toLowerCase().trim();
 
-      if (email !== ADMIN_EMAIL.toLowerCase()) {
+      if (userRole !== "admin") {
         window.location.href = "https://addrway-site.vercel.app";
         return null;
       }
